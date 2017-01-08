@@ -19,7 +19,8 @@ public class MultiplexerHandler implements Runnable {
     private Selector selector;
     private volatile boolean stop;
 
-    public MultiplexerHandler(int port) {
+    MultiplexerHandler(int port, boolean stop) {
+        this.stop = stop;
         try {
             selector = Selector.open();
             ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
@@ -32,17 +33,13 @@ public class MultiplexerHandler implements Runnable {
         }
     }
 
-    public void stop() {
-        this.stop = true;
-    }
-
     public void run() {
         while (!stop) {
             try {
-                selector.select();
+                selector.select(1000);
                 Set<SelectionKey> selectionKeys = selector.selectedKeys();
                 Iterator<SelectionKey> selectionKeyIterator = selectionKeys.iterator();
-                SelectionKey key = null;
+                SelectionKey key;
                 while (selectionKeyIterator.hasNext()) {
                     key = selectionKeyIterator.next();
                     selectionKeyIterator.remove();
@@ -50,7 +47,6 @@ public class MultiplexerHandler implements Runnable {
                         handleAction(key);
                     } catch (Exception e) {
                         if (key != null) {
-                            System.out.println("null");
                             key.cancel();
                             if (key.channel() != null) {
                                 key.channel().close();
@@ -100,6 +96,7 @@ public class MultiplexerHandler implements Runnable {
     }
 
     private void doEcho(SocketChannel socketChannel, String echo) throws IOException {
+        System.out.println("do echo : "+echo);
         if (echo != null && echo.trim().length() > 0) {
             byte[]bytes=echo.getBytes();
             ByteBuffer buffer=ByteBuffer.allocate(bytes.length);

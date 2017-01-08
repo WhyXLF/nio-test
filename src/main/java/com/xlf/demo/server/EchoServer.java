@@ -11,7 +11,7 @@ public class EchoServer {
         if (args!=null && args.length>0){
             port=Integer.parseInt(args[0]);
         }
-        MultiplexerHandler multiplexerHandler =new MultiplexerHandler(port);
+        MultiplexerHandler multiplexerHandler =new MultiplexerHandler(port, false);
         new Thread(multiplexerHandler).start();
     }
 }
