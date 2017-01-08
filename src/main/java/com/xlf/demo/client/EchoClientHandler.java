@@ -81,13 +81,46 @@ public class EchoClientHandler implements Runnable {
         }
     }
 
+    private class OuputHandler implements Runnable {
+        private SocketChannel socketChannel;
+
+        public OuputHandler(SocketChannel socketChannel) {
+            this.socketChannel = socketChannel;
+        }
+
+        @Override
+        public void run() {
+            try {
+                doWrite();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void doWrite() throws IOException {
+            Scanner scanner = new Scanner(System.in);
+            while (true) {
+                System.out.println("Please input what you want:");
+                String content = scanner.next();
+                byte[] bytes = content.getBytes(Charset.forName("UTF-8"));
+                ByteBuffer buffer = ByteBuffer.allocate(bytes.length);
+                buffer.put(bytes);
+                buffer.flip();
+                socketChannel.write(buffer);
+                if (!buffer.hasRemaining()) {
+                    System.out.println("Send order succeed!");
+                }
+            }
+        }
+    }
+
     private void handleInput(SelectionKey selectionKey) throws IOException {
         if (selectionKey.isValid()) {
             SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
             if (selectionKey.isConnectable()) {
                 if (socketChannel.finishConnect()) {
                     socketChannel.register(selector, SelectionKey.OP_READ);
-                    doWrite(socketChannel);
+                    new Thread(new OuputHandler(socketChannel)).start();
                 } else {
                     System.exit(1);
                 }
@@ -101,8 +134,9 @@ public class EchoClientHandler implements Runnable {
                     String body = new String(bytes, "UTF-8");
                     System.out.println("Now is : " + body);
                     this.stop = true;
-                }else if (readBytes<0){
-                    selectionKey.cancel();;
+                } else if (readBytes < 0) {
+                    selectionKey.cancel();
+                    ;
                     socketChannel.close();
                 }
             }
@@ -115,7 +149,6 @@ public class EchoClientHandler implements Runnable {
             if (socketChannel.connect(new InetSocketAddress(host, port))) {
                 System.out.println("connect ok !");
                 socketChannel.register(selector, SelectionKey.OP_READ);
-                doWrite(socketChannel);
             } else {
                 socketChannel.register(selector, SelectionKey.OP_CONNECT);
             }
@@ -124,17 +157,5 @@ public class EchoClientHandler implements Runnable {
         }
     }
 
-    private void doWrite(SocketChannel socketChannel) throws IOException {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("Please input what you want:");
-        String content = scanner.next();
-        byte[] bytes = content.getBytes(Charset.forName("UTF-8"));
-        ByteBuffer buffer = ByteBuffer.allocate(bytes.length);
-        buffer.put(bytes);
-        buffer.flip();
-        socketChannel.write(buffer);
-        if (!buffer.hasRemaining()) {
-            System.out.println("Send order succeed!");
-        }
-    }
+
 }
