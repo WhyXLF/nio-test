@@ -17,15 +17,13 @@ import java.util.Set;
  */
 public class MultiplexerHandler implements Runnable {
     private Selector selector;
-    private volatile boolean stop;
 
-    MultiplexerHandler(int port, boolean stop) {
-        this.stop = stop;
+    MultiplexerHandler(int port) {
         try {
             selector = Selector.open();
             ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+            serverSocketChannel.socket().bind(new InetSocketAddress("127.0.0.1", port));
             serverSocketChannel.configureBlocking(false);
-            serverSocketChannel.socket().bind(new InetSocketAddress(port));
             serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
         } catch (Exception e) {
             e.printStackTrace();
@@ -34,7 +32,7 @@ public class MultiplexerHandler implements Runnable {
     }
 
     public void run() {
-        while (!stop) {
+        while (true) {
             try {
                 selector.select(1000);
                 Set<SelectionKey> selectionKeys = selector.selectedKeys();
@@ -58,13 +56,6 @@ public class MultiplexerHandler implements Runnable {
                 e.printStackTrace();
             }
         }
-        if (selector != null) {
-            try {
-                selector.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     private void handleAction(SelectionKey selectionKey) throws IOException {
@@ -74,6 +65,8 @@ public class MultiplexerHandler implements Runnable {
                 SocketChannel socketChannel = serverSocketChannel.accept();
                 socketChannel.configureBlocking(false);
                 socketChannel.register(selector, SelectionKey.OP_READ);
+
+                selectionKey.interestOps(SelectionKey.OP_ACCEPT);
             }
             if (selectionKey.isReadable()) {
                 SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
@@ -84,9 +77,8 @@ public class MultiplexerHandler implements Runnable {
                     byte[] bytes = new byte[buffer.remaining()];
                     buffer.get(bytes);
                     String body = new String(bytes, "UTF-8");
-                    System.out.println("receive order: " + body);
-                    String echo = "echo :" + body;
-                    doEcho(socketChannel, echo);
+                    doEcho(socketChannel, body);
+                    selectionKey.interestOps(SelectionKey.OP_READ);
                 } else if (readBytes < 0) {
                     selectionKey.cancel();
                     socketChannel.close();
@@ -96,10 +88,10 @@ public class MultiplexerHandler implements Runnable {
     }
 
     private void doEcho(SocketChannel socketChannel, String echo) throws IOException {
-        System.out.println("do echo : "+echo);
+        System.out.println("do echo : " + echo);
         if (echo != null && echo.trim().length() > 0) {
-            byte[]bytes=echo.getBytes();
-            ByteBuffer buffer=ByteBuffer.allocate(bytes.length);
+            byte[] bytes = echo.getBytes();
+            ByteBuffer buffer = ByteBuffer.allocate(bytes.length);
             buffer.put(bytes);
             buffer.flip();
             socketChannel.write(buffer);

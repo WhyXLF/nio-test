@@ -22,7 +22,6 @@ public class EchoClientHandler implements Runnable {
 
     private Selector selector;
     private SocketChannel socketChannel;
-    private volatile boolean stop;
 
     EchoClientHandler(String host, int port) {
         this.host = host == null ? "127.0.0.1" : host;
@@ -31,30 +30,49 @@ public class EchoClientHandler implements Runnable {
             selector = Selector.open();
             socketChannel = SocketChannel.open();
             socketChannel.configureBlocking(false);
-
+            try {
+                doConnect();
+                new Thread(new OutputHandler()).start();
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.exit(1);
+            }
         } catch (IOException e) {
             System.exit(1);
             e.printStackTrace();
         }
     }
 
+    private class OutputHandler implements Runnable{
+
+        private void doWrite() throws IOException {
+            Scanner scanner=new Scanner(System.in);
+            while (true){
+                System.out.println("Please input what you want: ");
+                while (scanner.hasNextLine()){
+                    String line=scanner.nextLine();
+                    socketChannel.write(ByteBuffer.wrap(line.getBytes()));
+                }
+            }
+        }
+        @Override
+        public void run() {
+            try {
+                doWrite();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     @Override
     public void run() {
-        try {
-            doConnect();
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
-        while (!stop) {
+        while (true) {
             try {
                 selector.select(1000);
                 Set<SelectionKey> selectionKeys = selector.selectedKeys();
-                Iterator<SelectionKey> selectionKeyIterator = selectionKeys.iterator();
-                SelectionKey selectionKey;
-                while (selectionKeyIterator.hasNext()) {
-                    selectionKey = selectionKeyIterator.next();
-                    selectionKeyIterator.remove();
+                for(SelectionKey selectionKey:selectionKeys) {
+                    selector.selectedKeys().remove(selectionKey);
                     try {
                         handleKeys(selectionKey);
                     } catch (Exception e) {
@@ -72,75 +90,23 @@ public class EchoClientHandler implements Runnable {
                 System.exit(1);
             }
         }
-        if (selector != null) {
-            try {
-                selector.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private class OutputHandler implements Runnable {
-        private SocketChannel socketChannel;
-
-
-        OutputHandler(SocketChannel socketChannel) {
-            this.socketChannel = socketChannel;
-        }
-
-        @Override
-        public void run() {
-            try {
-                doWrite();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        private void doWrite() throws IOException {
-            Scanner scanner = new Scanner(System.in);
-            while (stop) {
-                System.out.println("Please input what you want:");
-                String content = scanner.next();
-                byte[] bytes = content.getBytes(Charset.forName("UTF-8"));
-                ByteBuffer buffer = ByteBuffer.allocate(bytes.length);
-                buffer.put(bytes);
-                buffer.flip();
-                socketChannel.write(buffer);
-                if (!buffer.hasRemaining()) {
-                    System.out.println("Send order succeed!");
-                }
-            }
-        }
     }
 
     private void handleKeys(SelectionKey selectionKey) throws IOException {
         if (selectionKey.isValid()) {
-            SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
-            if (selectionKey.isConnectable()) {
-                if (socketChannel.finishConnect()) {
-                    socketChannel.register(selector, SelectionKey.OP_READ);
-                    //开启写数据
-                    new Thread(new OutputHandler(socketChannel)).start();
-                } else {
-                    System.exit(1);
-                }
-            }
             if (selectionKey.isReadable()) {
-                System.out.println("readable");
+                SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
                 ByteBuffer buffer = ByteBuffer.allocate(1024);
-                int readBytes = socketChannel.read(buffer);
-                if (readBytes > 0) {
+                String content="";
+                while (socketChannel.read(buffer)>0){
+                    socketChannel.read(buffer);
                     buffer.flip();
-                    byte[] bytes = new byte[buffer.remaining()];
-                    String body = new String(bytes, "UTF-8");
-                    System.out.println("Now is : " + body);
-                    this.stop = true;
-                } else if (readBytes < 0) {
-                    selectionKey.cancel();
-                    socketChannel.close();
+                    byte[]bytes=new byte[buffer.remaining()];
+                    buffer.get(bytes);
+                    content+=new String(bytes,"UTF-8");
                 }
+                System.out.println("server echo : "+ content);
+                selectionKey.interestOps(SelectionKey.OP_READ);
             }
         }
     }
@@ -148,16 +114,15 @@ public class EchoClientHandler implements Runnable {
     private void doConnect() {
         System.out.println("start to connect ...");
         try {
-            if (socketChannel.connect(new InetSocketAddress(host, port))) {
-                System.out.println("connect ok !");
-                socketChannel.register(selector, SelectionKey.OP_READ);
-            } else {
-                socketChannel.register(selector, SelectionKey.OP_CONNECT);
-            }
+            socketChannel=SocketChannel.open(new InetSocketAddress(host,port));
+            System.out.println("connect ok!");
+            socketChannel.configureBlocking(false);
+            socketChannel.register(selector,SelectionKey.OP_READ);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
 
 
 }

@@ -8,9 +8,6 @@ package com.xlf.demo.client;
 public class EchoClient {
     public static void main(String[] args) {
         int port=8088;
-        if (args!=null && args.length>0){
-            port=Integer.parseInt(args[0]);
-        }
         EchoClientHandler echoClientHandler=new EchoClientHandler("127.0.0.1",port);
         new Thread(echoClientHandler).start();
         try {
