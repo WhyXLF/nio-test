@@ -15,10 +15,10 @@ import java.util.Set;
  * date:   2017/1/2.
  * description:
  */
-public class MultiplexerHandler implements Runnable {
+public class EchoServerHandler implements Runnable {
     private Selector selector;
 
-    MultiplexerHandler(int port) {
+    EchoServerHandler(int port) {
         try {
             selector = Selector.open();
             ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
@@ -65,8 +65,7 @@ public class MultiplexerHandler implements Runnable {
                 SocketChannel socketChannel = serverSocketChannel.accept();
                 socketChannel.configureBlocking(false);
                 socketChannel.register(selector, SelectionKey.OP_READ);
-
-                selectionKey.interestOps(SelectionKey.OP_ACCEPT);
+//                selectionKey.interestOps(SelectionKey.OP_ACCEPT);
             }
             if (selectionKey.isReadable()) {
                 SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
@@ -78,7 +77,7 @@ public class MultiplexerHandler implements Runnable {
                     buffer.get(bytes);
                     String body = new String(bytes, "UTF-8");
                     doEcho(socketChannel, body);
-                    selectionKey.interestOps(SelectionKey.OP_READ);
+//                    selectionKey.interestOps(SelectionKey.OP_READ);
                 } else if (readBytes < 0) {
                     selectionKey.cancel();
                     socketChannel.close();
